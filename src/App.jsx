@@ -1,121 +1,126 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import { useEffect, useState } from 'react'
+import TodoItem from './TodoItem.jsx'
 import './App.css'
 
+const STORAGE_KEY = 'todos'
+
+const FILTERS = {
+  all: () => true,
+  active: (todo) => !todo.done,
+  done: (todo) => todo.done,
+}
+
+function loadTodos() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY))
+    return Array.isArray(saved) ? saved : []
+  } catch {
+    return []
+  }
+}
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [todos, setTodos] = useState(loadTodos)
+  const [text, setText] = useState('')
+  const [filter, setFilter] = useState('all')
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(todos))
+    } catch {
+      // Storage can be unavailable (e.g. private mode); the list still works in memory.
+    }
+  }, [todos])
+
+  function addTodo(event) {
+    event.preventDefault()
+    const title = text.trim()
+    if (!title) return
+    setTodos([...todos, { id: crypto.randomUUID(), title, done: false }])
+    setText('')
+  }
+
+  function toggleTodo(id) {
+    setTodos(todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t)))
+  }
+
+  function deleteTodo(id) {
+    setTodos(todos.filter((t) => t.id !== id))
+  }
+
+  function clearDone() {
+    setTodos(todos.filter((t) => !t.done))
+  }
+
+  const visible = todos.filter(FILTERS[filter])
+  const remaining = todos.filter((t) => !t.done).length
+  const doneCount = todos.length - remaining
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
+    <main className="todo-app">
+      <h1>To-do list</h1>
+
+      <form className="add-form" onSubmit={addTodo}>
+        <input
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="What needs doing?"
+          aria-label="New to-do"
+          autoFocus
+        />
+        <button type="submit" disabled={!text.trim()}>
+          Add
         </button>
-      </section>
+      </form>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+      {todos.length > 0 && (
+        <div className="filters" role="group" aria-label="Filter to-dos">
+          {Object.keys(FILTERS).map((name) => (
+            <button
+              key={name}
+              type="button"
+              className={filter === name ? 'active' : ''}
+              aria-pressed={filter === name}
+              onClick={() => setFilter(name)}
+            >
+              {name[0].toUpperCase() + name.slice(1)}
+            </button>
+          ))}
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      )}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      <ul className="todo-list">
+        {visible.map((todo) => (
+          <TodoItem
+            key={todo.id}
+            todo={todo}
+            onToggle={toggleTodo}
+            onDelete={deleteTodo}
+          />
+        ))}
+      </ul>
+
+      {todos.length === 0 && (
+        <p className="empty">Nothing to do yet. Add your first task above.</p>
+      )}
+      {todos.length > 0 && visible.length === 0 && (
+        <p className="empty">No {filter} tasks.</p>
+      )}
+
+      {todos.length > 0 && (
+        <footer className="summary">
+          <span>
+            {remaining} {remaining === 1 ? 'task' : 'tasks'} left
+          </span>
+          {doneCount > 0 && (
+            <button type="button" className="link" onClick={clearDone}>
+              Clear completed ({doneCount})
+            </button>
+          )}
+        </footer>
+      )}
+    </main>
   )
 }
 
